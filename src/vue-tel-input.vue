@@ -26,7 +26,7 @@
     </div>
     <input v-model="phone"
            :placeholder="placeholder"
-           :state="state"
+           :state="isValid"
            :formatter="format"
            :disabled="disabled"
            @blur="onBlur"
@@ -123,7 +123,7 @@ ul {
 </style>
 
 <script>
-import { format, asYouType, isValidNumber } from 'libphonenumber-js';
+import { parseNumber, formatNumber } from 'libphonenumber-js';
 import allCountries from './assets/all-countries';
 import getCountry from './assets/default-country';
 
@@ -147,6 +147,9 @@ export default {
     },
   },
   mounted() {
+    console.log('MOUNTED 3!!!!');
+    console.log('this.activeCountry: ', this.activeCountry);
+
     if (!this.disabledFetchingCountry) {
       getCountry().then((res) => {
         this.activeCountry = allCountries.find(country => country.iso2 === res) ||
@@ -156,14 +159,14 @@ export default {
   },
   created() {
     if (this.value) {
-      this.phone = this.value
+      this.phone = this.value;
     }
   },
   data() {
     return {
       phone: '',
       allCountries,
-      activeCountry: allCountries[0],
+      activeCountry: allCountries[0], // TODO Make this U.S. ???
       open: false,
     };
   },
@@ -180,49 +183,92 @@ export default {
       }
       return 'normal';
     },
-    formattedResult() {
-      // Calculate phone number based on mode
-      if (!this.mode || !this.allCountries) {
-        return '';
-      }
-      let phone = this.phone;
-      if (this.mode === 'code') {
-        // If user manually type the country code
-        const formatter = new asYouType();// eslint-disable-line
-        formatter.input(this.phone);
 
-        // Find inputted country in the countries list
-        this.activeCountry = this.allCountries.find(ele =>
-          ele.iso2.toUpperCase() === formatter.country) || this.activeCountry;
-      } else if (this.mode === 'prefix') {
-        // Remove the first '0' if this is a '0' prefix number
-        // Ex: 0432421999
+    numbersOnly() {
+      // The model value, without any spaces, hyphens, or parens.
+      // A leading plus sign is allowed.
+      const numbersOnly = this.phone.replace(/\(|\)|\s|-/g, '');
+
+      console.log('numbersOnly: ', numbersOnly); // WHY ISN'T THIS LOGGING OUT?
+
+      return numbersOnly;
+    },
+
+    parsedNumber() {
+      // eslint-disable-next-line prefer-destructuring
+      let phone = this.phone;
+      // Remove any leading zero.
+      if (this.mode === 'prefix') {
         phone = this.phone.slice(1);
       }
-      return format(phone, this.activeCountry && this.activeCountry.iso2, 'International');
+
+      let parsedNumber;
+      // If user is manually typing the country code, infer the country and
+      // try to find it in the countries list.
+      if (this.mode === 'code') {
+        parsedNumber = parseNumber(phone);
+        if (parsedNumber.country && this.allCountries) {
+          const matchedCountry = this.allCountries.find(e =>
+            e.iso2.toUpperCase() === parsedNumber.country);
+          if (matchedCountry) {
+            // eslint-disable-next-line vue/no-side-effects-in-computed-properties
+            this.activeCountry = matchedCountry;
+          }
+        }
+      // Else parse based on the current activeCountry.
+      } else {
+        parsedNumber = parseNumber(phone, this.activeCountry.iso2);
+      }
+
+      console.group('parsedNumber');
+      console.log('phone: ', phone);
+      console.log('this.activeCountry: ', this.activeCountry);
+      console.log('parsedNumber: ', parsedNumber);
+      console.groupEnd();
+
+      return parsedNumber;
     },
-    state() {
-      return isValidNumber(this.formattedResult);
+
+    isValid() {
+      // Note that this is a very loose validity check.
+      console.log('isValid: ', !!this.parsedNumber.phone);
+      return !!this.parsedNumber.phone;
     },
+
+    formattedNumber() {
+      const fNum = this.parsedNumber.phone ?
+        formatNumber(this.parsedNumber, 'National') : '';
+      console.log('formattedNumber: ', fNum);
+      return fNum;
+    },
+
     response() {
-      const number = this.formattedResult && this.formattedResult.replace(/ /g, '');
       return {
-        number,
-        isValid: this.state,
+        number: this.parsedNumber,
+        isValid: this.isValid,
         country: this.activeCountry,
       };
     },
   },
+
   watch: {
-    state(value) {
+    isValid(value) {
+      console.log('watched isValid is: ', value);
+
+      // When the parsed input is valid, overwrite the model with the
+      // formatted string.
       if (value) {
-        // If mode is 'prefix', keep the number as user typed,
-        // Otherwise format it
-        this.phone = this.formattedResult;
+        console.log('formatting the input');
+        this.phone = this.formattedNumber;
       }
     },
   },
+
   methods: {
+    // TODO Write a method that listens for letter typing when the dropdown is
+    // open, and auto scrolls to the first country with that first letter,
+    // and auto-selects it.
+
     choose(country) {
       this.activeCountry = country;
       this.$emit('onInput', this.response);
@@ -237,46 +283,51 @@ export default {
     onBlur() {
       this.$emit('onBlur');
     },
-    toggleDropdown: function () {
+    toggleDropdown() {
       if (this.disabled) {
         return;
       }
       this.open = !this.open;
     },
-    clickedOutside: function () {
+    clickedOutside() {
       this.open = false;
     },
   },
+
   directives: {
     // Click-outside from BosNaufal: https://github.com/BosNaufal/vue-click-outside
     'click-outside': {
-      bind: function (el, binding, vNode) {
+      bind(el, binding, vNode) {
         // Provided expression must evaluate to a function.
         if (typeof binding.value !== 'function') {
-          var compName = vNode.context.name;
-          var warn = '[Vue-click-outside:] provided expression ' + binding.expression + ' is not a function, but has to be';
+          let warn = `[Vue-click-outside:] provided expression ${binding.expression}
+             is not a function, but has to be`;
+          const compName = vNode.context.name;
           if (compName) {
-            warn += 'Found in component ' + compName;
+            warn += `Found in component ${compName}`;
           }
           console.warn(warn);
         }
         // Define Handler and cache it on the element
-        var bubble = binding.modifiers.bubble;
-        var handler = function (e) {
+        const { bubble } = binding.modifiers;
+        function handler(e) {
           if (bubble || (!el.contains(e.target) && el !== e.target)) {
-            binding.value(e)
+            binding.value(e);
           }
-        };
+        }
+        // eslint-disable-next-line
         el.__vueClickOutside__ = handler;
-        // add Event Listeners
-        document.addEventListener('click', handler)
+        // Add Event Listeners.
+        document.addEventListener('click', handler);
       },
-      unbind: function (el, binding) {
-        // Remove Event Listeners
+      unbind(el) {
+        // Remove Event Listeners.
+        // eslint-disable-next-line no-underscore-dangle
         document.removeEventListener('click', el.__vueClickOutside__);
-        el.__vueClickOutside__ = null
-      }
-    }
-  }
+        // eslint-disable-next-line no-underscore-dangle, no-param-reassign
+        el.__vueClickOutside__ = null;
+      },
+    },
+  },
 };
 </script>

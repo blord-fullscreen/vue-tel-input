@@ -32,14 +32,18 @@
   ],
   "dependencies": {
     "get-json": "^1.0.0",
-    "libphonenumber-js": "^0.4.44"
+    "libphonenumber-js": "^1.4.2"
   },
   "devDependencies": {
-    "babel-eslint": "^7.2.3",
-    "eslint": "^3.19.0",
-    "eslint-config-airbnb-base": "^11.3.0",
-    "eslint-plugin-import": "^2.7.0",
+    "babel-eslint": "^8.2.6",
+    "eslint": "^4.19.1",
+    "eslint-config-airbnb": "^17.0.0",
+    "eslint-plugin-import": "^2.14.0",
+    "eslint-plugin-jsx-a11y": "^6.1.1",
+    "eslint-plugin-react": "^7.10.0",
+    "eslint-plugin-vue": "^4.7.1",
     "poi": "^9.4.3",
-    "serve": "^6.3.1"
+    "serve": "^6.3.1",
+    "vue-eslint-parser": "2.0.3"
   }
 }

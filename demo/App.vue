@@ -1,7 +1,7 @@
 <template>
   <div id="app">
     <h1>Telephone Input Vue</h1>
-    <h2 style="color: #999">made with &#x2764; by Steven.</h2>
+    <h2 style="color: #999">made with &#x2764; by Ben.</h2>
     <div style="width: 500px; margin: 20px auto;">
       <vue-tel-input @onInput="onInput">
       </vue-tel-input>
